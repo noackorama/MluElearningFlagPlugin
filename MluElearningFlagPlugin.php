@@ -71,6 +71,50 @@ class MluElearningFlagPlugin extends StudipPlugin implements SystemPlugin
                      jQuery(function (\$) {\$('#user_profile tr td h1').before('$snippet');})");
             }
         }
+        // set up tab navigation
+        if ($GLOBALS['perm']->have_perm('root')) {
+            $navigation = new Navigation("ELearning Veranstaltungen");
+            $navigation->setURL(PluginEngine::getURL($this));
+            Navigation::addItem('/start/'.get_class($this), $navigation);
+        }
+    }
+
+    function show_action()
+    {
+        if (!$GLOBALS['perm']->have_perm("root")) {
+            $GLOBALS['perm']->perm_invalid();
+        }
+        $courses = Course::findMany($this->getElearningCourses(), 'ORDER BY start_time,Name');
+        $captions = array(_("Nummer"), _("Name"), _("Dozenten"), _("ELearning Art"), _("Teilnehmer aktuell"), _("Semester"));
+        $data = array();
+        foreach ($courses as $course) {
+            $row = array();
+            if (!Request::submitted('download_filter')) $row[] = $course->id;
+            $row[] = $course->veranstaltungsnummer;
+            $row[] = $course->name;
+            $row[] = join(', ', $course->members->findBy('status','dozent')->orderBy('position')->pluck('Nachname'));
+            $row[] = $course->datafields->findOneBy('datafield_id', $this->datafield_id)->content;
+            $row[] = count($course->members->findBy('status', array('autor','user','tutor')));
+            $row[] = $course->start_semester->name;
+            $data[] = $row;
+        }
+        if (Request::submitted('download_filter') && Request::isPost()) {
+            $tmpname = md5(uniqid('tmp'));
+            if (array_to_csv($data, $GLOBALS['TMP_PATH'].'/'.$tmpname, $captions)) {
+                header("Location: " . GetDownloadLink($tmpname, 'elearning-veranstaltungen.csv', 4, 'force'));
+                page_close();
+                die();
+            }
+        }
+        PageLayout::setTitle(_("Übersicht ELearning Veranstaltungen"));
+        PageLayout::addHeadElement('script', array("src"  => URLHelper::getScriptUrl("plugins_packages/data-quest/MluElearningFlagPlugin/assets/jquery.dataTables.min.js"),
+                                             "type" => "text/javascript"
+                                           ));
+        $template_factory = new Flexi_TemplateFactory(dirname(__file__)."/templates");
+        $template = $template_factory->open('overview.php');
+        $template->set_layout($GLOBALS['template_factory']->open('layouts/base_without_infobox.php'));
+        echo $template->render(compact('data','captions'));
+
     }
 
     function getElearningCourses()

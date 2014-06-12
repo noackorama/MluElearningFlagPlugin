@@ -1,0 +1,5 @@
+pluginname=MluElearningFlagPlugin
+pluginclassname=MluElearningFlagPlugin
+origin=data-quest
+version=1
+StudipMinVersion=2.4

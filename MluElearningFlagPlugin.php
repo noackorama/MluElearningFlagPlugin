@@ -35,10 +35,11 @@ class MluElearningFlagPlugin extends StudipPlugin implements SystemPlugin
                 '</h2>
                 <div style="text-align:left">
                 <h3>' . formatReady($df->getDescription()) . '</h3><ul style="list-style-type:none">';
+                $values = $df->getValue() ? explode(',', $df->getValue()) : array();
                 foreach (current($df->getParams()) as $k => $v) {
                     $snippet .= '<li>';
                     $snippet .= '<label>
-                    <input type="radio" name="datafields['.$df->getId().']" value="'.$k.'" '.($k == $df->getValue() ? 'checked' : '').'>
+                    <input type="checkbox" name="datafields['.$df->getId().'][]" value="'.$k.'" '.(in_array($k, $values) ? 'checked' : '').'>
                     '.htmlReady($v).'</label>
                     </li>';
                 }
@@ -46,7 +47,15 @@ class MluElearningFlagPlugin extends StudipPlugin implements SystemPlugin
 
                  $snippet = jsready($snippet, 'script-double');
                  PageLayout::addHeadElement('script', array('type' => 'text/javascript'),"
-                     jQuery(function (\$) {\$('#settings h2').last().next('div').after('$snippet');
+                     jQuery(function (\$) {
+                     \$('select[name^=\"datafields[{$this->datafield_id}]\"]').closest('tr').hide();
+                     \$('#settings h2').last().next('div').after('$snippet');
+                     \$('input[name^=\"datafields[{$this->datafield_id}]\"]').
+                     first().on('change', function() {
+                        if (this.checked) {
+                        jQuery('input[name^=\"datafields[{$this->datafield_id}]\"]:checked').attr('checked', false);
+                        }
+                     });
                      var active_accordion = jQuery('#settings').accordion('option','active');
                      jQuery('#settings').accordion('destroy').accordion({
                         active: active_accordion,
@@ -61,7 +70,8 @@ class MluElearningFlagPlugin extends StudipPlugin implements SystemPlugin
         }
         if (strpos($_SERVER['REQUEST_URI'], 'dispatch.php/profile') !== false) {
             $user = User::findByUsername(Request::username('username', $GLOBALS['user']->username));
-            if ($user->username == Config::get()->MLU_ELEARNING_KING) {
+            $the_kings = array_map('trim', split("[,;\n]",Config::get()->MLU_ELEARNING_KING));
+            if (in_array($user->username, $the_kings)) {
                 $snippet = '<div>
                             <img title="KönigIn des ELearning"
                             src="'.URLHelper::getScriptUrl('plugins_packages/data-quest/MluElearningFlagPlugin/images/king_of_elearning.png').'">
@@ -120,13 +130,13 @@ class MluElearningFlagPlugin extends StudipPlugin implements SystemPlugin
     function getElearningCourses()
     {
         $db = DBManager::get();
-        return $db->query("SELECT range_id FROM datafields_entries WHERE content > 0 AND datafield_id=" . $db->quote($this->datafield_id))->fetchAll(PDO::FETCH_COLUMN);
+        return $db->query("SELECT range_id FROM datafields_entries WHERE content <> 0 AND datafield_id=" . $db->quote($this->datafield_id))->fetchAll(PDO::FETCH_COLUMN);
     }
 
     function checkElearningCourse($id)
     {
         $db = DBManager::get();
-        $st = $db->prepare("SELECT 1 FROM datafields_entries WHERE content > 0 AND datafield_id=? AND range_id=?");
+        $st = $db->prepare("SELECT 1 FROM datafields_entries WHERE content <> 0 AND datafield_id=? AND range_id=?");
         $st->execute(array($this->datafield_id, $id));
         return $st->fetch();
     }

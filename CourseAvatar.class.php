@@ -36,6 +36,7 @@ class CourseAvatar extends Avatar
     function getURL($size, $ext = 'png') {
         $plugin = PluginEngine::getPlugin('MluElearningFlagPlugin');
         if ($plugin && $plugin->checkElearningCourse($this->user_id)) {
+            $this->is_elearning = true;
             return sprintf('%s/%s_%s.%s',
                                      URLHelper::getScriptUrl('plugins_packages/data-quest/MluElearningFlagPlugin/images'),
                                      'elearning',
@@ -108,7 +109,6 @@ class CourseAvatar extends Avatar
      */
     function getDefaultTitle()
     {
-        require_once 'lib/classes/Seminar.class.php';
         return Seminar::GetInstance($this->user_id)->name;
     }
 
@@ -119,5 +119,40 @@ class CourseAvatar extends Avatar
     protected function checkAvatarVisibility() {
         //no special conditions for visibility of course-avatars yet
         return true;
+    }
+
+    function getImageTag($size = Avatar::MEDIUM, $opt = array()) {
+
+        $opt['src'] = $this->getURL($size);
+
+        if ($this->is_elearning) {
+            if ($course = Course::find($this->user_id)) {
+                if ($df = current(DatafieldEntryModel::findByModel($course, 'e450484d672cd10ed04d790e475b4c16'))) {
+                    $df = $df->getTypedDatafield();
+                    $opt['title'] = $df->getDisplayValue();
+                }
+            }
+        }
+        if (isset($opt['class'])) {
+            $opt['class'] = $this->getCssClass($size) . ' ' . $opt['class'];
+        } else {
+            $opt['class'] = $this->getCssClass($size);
+        }
+
+        if (!isset($opt['title'])) {
+            $opt['title'] = htmlReady($this->getDefaultTitle());
+        }
+
+        if (!isset($opt['alt'])) {
+            $opt['alt'] = $opt['title'];
+        }
+
+        $result = '';
+
+        foreach ($opt as $key => $value) {
+            $result .= sprintf('%s="%s" ', $key, $value);
+        }
+
+        return '<img ' . $result . '>';
     }
 }

@@ -1,0 +1,89 @@
+Index: app/views/admin/datafields/index.php
+===================================================================
+--- app/views/admin/datafields/index.php	(Revision 32110)
++++ app/views/admin/datafields/index.php	(Arbeitskopie)
+@@ -55,13 +55,13 @@
+                 <?= htmlReady($val->getName()) ?>
+             </td>
+             <td>
+-            <? if (in_array($val->getType(), array('selectbox', 'radio', 'combo'))): ?>
++            <? if (in_array($val->getType(), array('selectbox', 'selectboxmultiple', 'radio', 'combo'))): ?>
+                 <a class="datafield_param_link" href="<?=$controller->url_for('admin/datafields/index/'. $current_class .'?edit_id='. $val->getID())?>">
+                     <?= Assets::img('icons/16/blue/edit.png', array('class'=> 'text-top', 'title' => 'Einträge bearbeiten')) ?>
+                 </a>
+             <? endif; ?>
+              <span><?= htmlReady($val->getType()) ?></span>
+-            <? if (in_array($val->getType(), array('selectbox', 'radio', 'combo'))): ?>
++            <? if (in_array($val->getType(), array('selectbox', 'selectboxmultiple','radio', 'combo'))): ?>
+                    <?= $this->render_partial("admin/datafields/_param", array('datafield_id' => $val->getID(), 'typeparam' => $val->getTypeparam(), 'hidden' => $edit_id!=$val->getID() )) ?>
+             <? endif; ?>
+             </td>
+@@ -86,7 +86,7 @@
+               <?= Assets::img('icons/16/grey/'.(trim($val->getDescription())?'accept.png':'decline.png'))?>
+              <? endif; ?>
+             </td>
+-            
++
+             <td><?= $val->getPriority() ?></td>
+             <td><?= $val->getCachedNumEntries() ?></td>
+             <td style="text-align: right;">
+Index: lib/classes/DataFieldEntry.class.php
+===================================================================
+--- lib/classes/DataFieldEntry.class.php	(Revision 32110)
++++ lib/classes/DataFieldEntry.class.php	(Arbeitskopie)
+@@ -229,7 +229,7 @@
+      */
+     public static function getSupportedTypes()
+     {
+-        return array("bool" , "textline" , "textarea" , "selectbox" , "date" , "time" , "email" , "phone" , "radio" , "combo" , "link");
++        return array("bool" , "textline" , "textarea" , "selectbox" , "date" , "time" , "email" , "phone" , "radio" , "combo" , "link" ,"selectboxmultiple");
+     }
+ 
+     /**
+@@ -624,6 +624,46 @@
+     }
+ }
+ 
++class DataFieldSelectboxMultipleEntry extends DataFieldSelectboxEntry
++{
++
++    function getHTML($name)
++    {
++        $field_name = $name . '[' . $this->structure->getID() . '][]';
++        $field_id = $name . '_' . $this->structure->getID();
++        $require = $this->structure->getIsRequired() ? "required" : "";
++        $ret = "<select multiple name=\"$field_name\" name=\"$field_id\" $require>";
++        $values = $this->getValue() ? explode(',', $this->getValue()) : array();
++        foreach($this->type_param as $pkey => $pval)
++        {
++            $value = $this->is_assoc_param ? (string) $pkey : $pval;
++            $sel = in_array($value, $values) ? 'selected' : '';
++            $ret .= sprintf('<option value="%s" %s>%s</option>', htmlReady($value), $sel, htmlReady($pval));
++        }
++        return $ret . "</select>";
++    }
++
++    function getDisplayValue($entities = true)
++    {
++        $value = $this->getValue();
++        if ($this->is_assoc_param && $value) {
++            $type_param = $this->type_param;
++            $value =  join('; ', (array_map(function ($a) use ($type_param){return $type_param[trim($a)];}, explode(',', $value))));
++        }
++        return $entities ? htmlReady($value) : $value;
++    }
++
++    function setValueFromSubmit($value)
++    {
++        if(is_array($value))
++        {
++            parent::setValueFromSubmit(join(',', array_unique(array_filter(array_map('trim',$value)))));
++        } else {
++            parent::setValueFromSubmit('');
++        }
++    }
++}
++
+ class DataFieldRadioEntry extends DataFieldSelectboxEntry
+ {
+     function numberOfHTMLFields()
